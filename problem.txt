@@ -1,0 +1,2 @@
+url1
+c a b = r_triangle c a b; o = semicircle o c b a
