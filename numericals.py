@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import math
 from typing import Any, Optional, Union
+import random
 
 import matplotlib.axes
 
@@ -28,6 +29,9 @@ import matplotlib.colors as mcolors
 import numpy as np
 from numpy.random import uniform as unif  # pylint: disable=g-importing-member
 import graph as gh
+from collections import defaultdict
+from itertools import combinations
+
 
 matplotlib.use('TkAgg')
 
@@ -1179,7 +1183,7 @@ def check_points_semicircle(p1, p2, p3):
     }
 
 def _draw_semicircle(
-    ax: matplotlib.axes.Axes, P1: Point, P2: Point, P3: Point, color: Any = 'cyan', lw: float = 1.2
+    ax: matplotlib.axes.Axes, P1: Point = None, P2: Point = None, P3: Point = None, color: Any = 'cyan', lw: float = 1.2
 ) -> None:
     """
     Draws a semicircle passing through three points or with one or two points on the diameter.
@@ -1190,45 +1194,71 @@ def _draw_semicircle(
         color (Any): Color of the semicircle.
         lw (float): Line width of the semicircle.
     """
-    result = check_points_semicircle((P1.x, P1.y), (P2.x, P2.y), (P3.x, P3.y))
-    if not result['is_valid']:
-        print("Points are collinear; cannot form a semicircle.")
-        return
-    
-    cx, cy = result['center']
-    radius = result['radius']
-    diameter_points = result['diameter_points']
+    points = [P for P in (P1, P2, P3) if P is not None]  # Filter out None values
+    if len(points) == 2:
+      cx = (P1.x + P2.x) / 2
+      cy = (P1.y + P2.y) / 2
+      radius = np.sqrt((P2.x - P1.x) ** 2 + (P2.y - P1.y) ** 2) / 2
 
-    # If no pair forms a diameter, determine angles for all three points
-    if diameter_points is None:
-        # Calculate angles of all three points relative to the circle's center
-        angles = np.arctan2(
-            [P1.y - cy, P2.y - cy, P3.y - cy], 
-            [P1.x - cx, P2.x - cx, P3.x - cx]
-        )
-        angles = (angles + 2 * np.pi) % (2 * np.pi)  # Normalize to [0, 2π]
+      # Compute angle of the diameter
+      angle_diameter = np.arctan2(P2.y - P1.y, P2.x - P1.x)
+
+      # Randomly determine the orientation of the semicircle
+      offset_angle = np.pi / 2 if random.choice([True, False]) else -np.pi / 2
+
+      # Start and end angles for the semicircle
+      start_angle = angle_diameter + offset_angle
+      end_angle = start_angle + np.pi
+
+      # Generate points for the semicircle
+      t = np.linspace(start_angle, end_angle, 100)
+      x = cx + radius * np.cos(t)
+      y = cy + radius * np.sin(t)
+      
+      # Plot the semicircle
+      ax.plot(x, y, color=color, lw=lw)
+  
+    if len(points) == 3:
         
-        # Determine the start and end angle for the semicircle
-        start_angle = np.min(angles)
-        end_angle = np.max(angles)
-        if end_angle - start_angle > np.pi:
-            start_angle, end_angle = end_angle, start_angle + 2 * np.pi
-    else:
-        # Use diameter points to define the semicircle angles
-        px, py = diameter_points[0]
-        qx, qy = diameter_points[1]
-        start_angle = np.arctan2(py - cy, px - cx)
-        end_angle = np.arctan2(qy - cy, qx - cx)
-        if end_angle - start_angle > np.pi:
-            start_angle, end_angle = end_angle, start_angle + 2 * np.pi
+      result = check_points_semicircle((P1.x, P1.y), (P2.x, P2.y), (P3.x, P3.y))
+      if not result['is_valid']:
+          print("Points are collinear; cannot form a semicircle.")
+          return
+      
+      cx, cy = result['center']
+      radius = result['radius']
+      diameter_points = result['diameter_points']
 
-    # Generate points for the semicircle
-    t = np.linspace(start_angle, end_angle, 100)
-    x = cx + radius * np.cos(t)
-    y = cy + radius * np.sin(t)
-    
-    # Plot the semicircle
-    ax.plot(x, y, color=color, lw=lw)
+      # If no pair forms a diameter, determine angles for all three points
+      if diameter_points is None:
+          # Calculate angles of all three points relative to the circle's center
+          angles = np.arctan2(
+              [P1.y - cy, P2.y - cy, P3.y - cy], 
+              [P1.x - cx, P2.x - cx, P3.x - cx]
+          )
+          angles = (angles + 2 * np.pi) % (2 * np.pi)  # Normalize to [0, 2π]
+          
+          # Determine the start and end angle for the semicircle
+          start_angle = np.min(angles)
+          end_angle = np.max(angles)
+          if end_angle - start_angle > np.pi:
+              start_angle, end_angle = end_angle, start_angle + 2 * np.pi
+      else:
+          # Use diameter points to define the semicircle angles
+          px, py = diameter_points[0]
+          qx, qy = diameter_points[1]
+          start_angle = np.arctan2(py - cy, px - cx)
+          end_angle = np.arctan2(qy - cy, qx - cx)
+          if end_angle - start_angle > np.pi:
+              start_angle, end_angle = end_angle, start_angle + 2 * np.pi
+
+      # Generate points for the semicircle
+      t = np.linspace(start_angle, end_angle, 100)
+      x = cx + radius * np.cos(t)
+      y = cy + radius * np.sin(t)
+      
+      # Plot the semicircle
+      ax.plot(x, y, color=color, lw=lw)
     
 def draw_semicircle(
     ax: matplotlib.axes.Axes, semicircle: SemiCircle, color: Any = 'cyan'
@@ -1350,13 +1380,38 @@ def highlight(
     _draw_line(ax, m, n, color=color1, lw=2.0, alpha=0.5)
     _draw_line(ax, p, q, color=color2, lw=2.0, alpha=0.5)
   
-  elif name == 'semicircle':
+  if name == 'iso_triangle':
+    a, b, c = args
+    _draw_line(ax, c, b, color=color1, lw=2.0)
+    _draw_line(ax, c, a, color=color1, lw=2.0)
+    _draw_line(ax, b, a, color=color2, lw=2.0)
+
+  if name == 'semicircle':
         o, a, b, c = args
         _draw_semicircle(ax, SemiCircle(center=o, p1=a, p2=b, p3=c), color=color1, lw=2.0)
 
+def convert_point(gm_point: gm.Point) -> Point:
+    return Point(gm_point.num.x, gm_point.num.y)
 
 HCOLORS = None
 
+def find_pairs_with_same_distance(line_lengths):
+    # Step 1: Group point pairs by distance
+    distance_groups = defaultdict(list)
+    for (p1, p2), distance in line_lengths.items():
+        distance_groups[distance].append((p1, p2))
+    
+    # Step 2: Find combinations of pairs with the same distance
+    result = []
+    for pairs in distance_groups.values():
+        if len(pairs) > 1:  # Only consider distances with multiple pairs
+            for i in range(len(pairs)):
+                for j in range(i + 1, len(pairs)):
+                    line1 = pairs[i]
+                    line2 = pairs[j]
+                    result.append((line1, line2))  # Group as ((p1, p2), (p3, p4))
+    
+    return result
 
 def _draw(
     ax: matplotlib.axes.Axes,
@@ -1370,6 +1425,7 @@ def _draw(
 ):
   """Draw everything."""
   colors = ['red', 'green', 'blue', 'orange', 'magenta', 'purple']
+  colors_highlight = [ 'orange', 'magenta', 'purple']
   pcolor = 'black'
   lcolor = 'black'
   ccolor = 'grey'
@@ -1382,15 +1438,58 @@ def _draw(
     colors = ['grey']
 
   line_boundaries = []
+  line_lengths = {}
+
+  
+  # Convert all points
+  for p in points:
+    points_numericals = [convert_point(p) for p in points]
   for l in lines:
     p1, p2 = draw_line(ax, l, color=lcolor)
     line_boundaries.append((p1, p2))
+    points_numericals.append(p1)
+    points_numericals.append(p2)
+  unique_points = []
+  seen = set()
+  for p in points_numericals:
+    if (p.x, p.y) not in seen:
+      unique_points.append(p)
+      seen.add((p.x, p.y))
+  print(len(unique_points))
+
+  for p1, p2 in combinations(unique_points, 2):
+    line_lengths[(p1, p2)] = round(p1.distance(p2), 4)
+  
+    
+
   circles = [draw_circle(ax, c, color=ccolor) for c in circles]
   semicircles = [draw_semicircle(ax, c, color=ccolor) for c in semicircles]
 
   for p in points:
     draw_point(ax, p.num, p.name, line_boundaries, circles, semicircles, color=pcolor)
 
+  same_length_pairs = find_pairs_with_same_distance(line_lengths)
+  print(len(same_length_pairs))
+
+  length_color_map = {}  # Dictionary to map length to its color
+  for i, ((p1, p2), (p3, p4)) in enumerate(same_length_pairs):
+    line_length = p1.distance(p2)  # Calculate the length of the line
+    print(f"Pair {i + 1}: Line (({p1}, {p2})) and Line (({p3}, {p4})) have the same length.")
+    
+    if line_length not in length_color_map:  # Check if length is already in the dictionary
+        #color = colors_highlight[i % len(colors_highlight)]
+        color = colors_highlight[i % len(colors_highlight) ]  # Assign a new color
+        length_color_map[line_length] = color  # Store the length and color in the dictionary
+    else:
+        color = length_color_map[line_length]  # Use the existing color for this length
+
+    # Call the highlight function with the determined color
+    highlight(ax, 'cong', [p1, p2, p3, p4], lcolor, color, color)
+    print('Highlight has been called')
+
+
+
+    
   if equals:
     for i, segs in enumerate(equals['segments']):
       color = colors[i % len(colors)]
@@ -1415,6 +1514,12 @@ def _draw(
     name, args = goal
     lcolor = color1 = color2 = 'red'
     highlight(ax, name, args, lcolor, color1, color2)
+  
+  
+  
+  
+  
+
 
 
 THEME = 'dark'
