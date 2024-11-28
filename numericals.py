@@ -1114,6 +1114,7 @@ def draw_circle(
     ax: matplotlib.axes.Axes, circle: Circle, color: Any = 'cyan'
 ) -> Circle:
   """Draw a circle."""
+  name_circle = circle.name
   if circle.num is not None:
     circle = circle.num
   else:
@@ -1121,11 +1122,15 @@ def draw_circle(
     if len(points) <= 2:
       return
     points = [p.num for p in points]
+    print(len(points))
     p1, p2, p3 = points[:3]
     circle = Circle(p1=p1, p2=p2, p3=p3)
-    
-  _draw_circle(ax, circle, color)
-  return circle
+
+  if "," in name_circle:
+    _draw_circle(ax, circle, color)
+    return circle
+  else:
+    return circle
 
 def check_points_semicircle(p1, p2, p3):
     """
@@ -1319,9 +1324,7 @@ def highlight(
   """Draw highlights."""
   args = list(map(lambda x: x.num if isinstance(x, gm.Point) else x, args))
 
-  if name == 'cyclic':
-    a, b, c, d = args
-    _draw_circle(ax, Circle(p1=a, p2=b, p3=c), color=color1, lw=2.0)
+  
   if name == 'coll':
     a, b, c = args
     a, b = max(a, b, c), min(a, b, c)
@@ -1425,7 +1428,8 @@ def _draw(
 ):
   """Draw everything."""
   colors = ['red', 'green', 'blue', 'orange', 'magenta', 'purple']
-  colors_highlight = [ 'orange', 'magenta', 'purple']
+  colors_highlight = [color for color in mcolors.TABLEAU_COLORS.keys() if color not in colors]
+
   pcolor = 'black'
   lcolor = 'black'
   ccolor = 'grey'
@@ -1458,7 +1462,7 @@ def _draw(
   print(len(unique_points))
 
   for p1, p2 in combinations(unique_points, 2):
-    line_lengths[(p1, p2)] = round(p1.distance(p2), 4)
+    line_lengths[(p1, p2)] = round(p1.distance(p2), 9)
   
     
 
@@ -1473,9 +1477,7 @@ def _draw(
 
   length_color_map = {}  # Dictionary to map length to its color
   for i, ((p1, p2), (p3, p4)) in enumerate(same_length_pairs):
-    line_length = p1.distance(p2)  # Calculate the length of the line
-    print(f"Pair {i + 1}: Line (({p1}, {p2})) and Line (({p3}, {p4})) have the same length.")
-    
+    line_length = p1.distance(p2)  # Calculate the length of the line    
     if line_length not in length_color_map:  # Check if length is already in the dictionary
         #color = colors_highlight[i % len(colors_highlight)]
         color = colors_highlight[i % len(colors_highlight) ]  # Assign a new color
@@ -1485,7 +1487,6 @@ def _draw(
 
     # Call the highlight function with the determined color
     highlight(ax, 'cong', [p1, p2, p3, p4], lcolor, color, color)
-    print('Highlight has been called')
 
 
 
@@ -2061,6 +2062,10 @@ def sketch_hline(args: tuple[gm.Point, ...]) -> HalfLine:
 def sketch_midp(args: tuple[gm.Point, ...]) -> Point:
   a, b = args
   return (a + b) * 0.5
+
+def sketch_foot(args: tuple[gm.Point, ...]) -> Point:
+  a, b, c = args
+  return a.foot(Line(b, c))
 
 
 def sketch_pentagon(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
