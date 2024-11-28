@@ -2773,7 +2773,7 @@ class Graph:
 
       # not necessary for proofing, but for visualization.
       c_args = list(map(lambda x: self.get(x, lambda: int(x)), c.args))
-      self.additionally_draw(c.name, c_args)
+      #self.additionally_draw(c.name, c_args)
 
       for points, bs in cdef.basics:
         if points:
