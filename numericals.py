@@ -1067,7 +1067,7 @@ def _draw_line(
 
 
 def draw_line(
-    ax: matplotlib.axes.Axes, line: Line, color: Any = 'white'
+    ax: matplotlib.axes.Axes, line: Line, color: Any = 'white', draw: bool = True
 ) -> tuple[Point, Point]:
   """Draw a line."""
   points = line.neighbors(gm.Point)
@@ -1087,8 +1087,11 @@ def draw_line(
       pmax = p, v
 
   p1, p2 = pmin[0], pmax[0]
-  _draw_line(ax, p1, p2, color=color)
-  return p1, p2
+  if draw:
+    _draw_line(ax, p1, p2, color=color)
+    return p1, p2
+  else:
+    return p1, p2
 
 
 def _draw_circle(
@@ -1416,6 +1419,105 @@ def find_pairs_with_same_distance(line_lengths):
     
     return result
 
+
+
+import numpy as np
+import matplotlib.patches
+import matplotlib.pyplot as plt
+from itertools import combinations
+
+def calculate_angle(p1, p2, p3, p4):
+    """Calculates the angle between two lines formed by points (p1, p2) and (p3, p4) in degrees."""
+    # Determine the common point
+    if p2 == p3:
+        common = p2
+        other_points = (p1, p4)
+        v1 = np.array([p1.x - p2.x, p1.y - p2.y])
+        v2 = np.array([p4.x - p2.x, p4.y - p2.y])
+    elif p1 == p4:
+        common = p1
+        other_points = (p2, p3)
+        v1 = np.array([p2.x - p1.x, p2.y - p1.y])
+        v2 = np.array([p3.x - p1.x, p3.y - p1.y])
+    elif p1 == p3:
+        common = p1
+        other_points = (p2, p4)
+        v1 = np.array([p2.x - p1.x, p2.y - p1.y])
+        v2 = np.array([p4.x - p1.x, p4.y - p1.y])
+    elif p2 == p4:
+        common = p2
+        other_points = (p1, p3)
+        v1 = np.array([p1.x - p2.x, p1.y - p2.y])
+        v2 = np.array([p3.x - p2.x, p3.y - p2.y])
+    else:
+        return None, None, None  # No shared point, angle cannot be calculated
+
+    # Calculate the angle
+    cos_angle = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+    cos_angle = np.clip(cos_angle, -1, 1)  # Ensure valid range for acos
+    angle_rad = np.arccos(cos_angle)
+    return common, other_points, round(np.degrees(angle_rad), 5)
+
+def highlight_angle2(ax, origin, p1, p2, radius, color):
+    """Highlights the angle formed by two vectors meeting at 'origin'."""
+    # Calculate angles of vectors
+    angle1 = np.arctan2(p1.y - origin.y, p1.x - origin.x)
+    angle2 = np.arctan2(p2.y - origin.y, p2.x - origin.x)
+
+    # Convert to degrees and ensure the smaller angle is first
+    angle1_deg, angle2_deg = sorted(np.degrees([angle1, angle2]))
+    if angle2_deg - angle1_deg > 180:
+        angle1_deg, angle2_deg = angle2_deg, angle1_deg
+    
+    # Draw the wedge
+    wedge = matplotlib.patches.Wedge(
+        center=(origin.x, origin.y),
+        r=radius,
+        theta1=angle1_deg,
+        theta2=angle2_deg,
+        color=color,
+        alpha=0.5
+    )
+    ax.add_patch(wedge)
+    print("Angle highlighted with color:", color)
+
+def search_in_dict(num, my_dict):
+    for key in my_dict.keys():
+        if round(key, 3) == round(num, 3):
+            return True
+    return False
+
+def highlight_same_angle(ax, lines, color_list):
+    """Highlights angles formed at shared points by pairs of lines."""
+    lines_list = [(draw_line(ax, l, draw=False)) for l in lines]  # Extract points for all lines
+    angle_color_radius = {}
+
+    for line1, line2 in combinations(lines_list, 2):
+        # Calculate the angle
+        common_point, other_points, angle = calculate_angle(*line1, *line2)
+        if angle is None or angle > 90:
+            continue  # Skip invalid or small angles
+
+        if search_in_dict(angle, angle_color_radius) == False:
+          # Assign color and radius for this unique angle
+          color = color_list[len(angle_color_radius) % len(color_list)]
+          radius = 0.1 + len(angle_color_radius) * 0.05
+          angle_color_radius[round(angle,3)] = (color, radius)
+          print(type(angle))
+        else:
+          color, radius = angle_color_radius[round(angle, 3)]
+          print(type(angle))
+
+        # Highlight the angle
+        highlight_angle2(ax, common_point, *other_points, radius, color)
+  
+
+        
+
+
+
+  
+
 def _draw(
     ax: matplotlib.axes.Axes,
     points: list[gm.Point],
@@ -1443,7 +1545,6 @@ def _draw(
 
   line_boundaries = []
   line_lengths = {}
-
   
   # Convert all points
   for p in points:
@@ -1487,7 +1588,7 @@ def _draw(
 
     # Call the highlight function with the determined color
     highlight(ax, 'cong', [p1, p2, p3, p4], lcolor, color, color)
-
+    highlight_same_angle(ax, lines, color_list=colors_highlight)
 
 
     
