@@ -1501,7 +1501,7 @@ def highlight_same_angle(ax, lines, color_list):
         if search_in_dict(angle, angle_color_radius) == False:
           # Assign color and radius for this unique angle
           color = color_list[len(angle_color_radius) % len(color_list)]
-          radius = 0.1 + len(angle_color_radius) * 0.05
+          radius = 0.05 + len(angle_color_radius) * 0.01
           angle_color_radius[round(angle,3)] = (color, radius)
           print(type(angle))
         else:
