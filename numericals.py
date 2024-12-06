@@ -31,6 +31,8 @@ from numpy.random import uniform as unif  # pylint: disable=g-importing-member
 import graph as gh
 from collections import defaultdict
 from itertools import combinations
+import matplotlib.transforms as transforms
+
 
 
 matplotlib.use('TkAgg')
@@ -579,7 +581,11 @@ def circle_circle_intersection(c1: Circle, c2: Circle) -> tuple[Point, Point]:
   return Point(x3, y3), Point(x4, y4)
 
 
-
+def angle_between_lines(l1: Line, l2: Line) -> float:
+  a, b, _ = l1.coefficients
+  x, y, _ = l2.coefficients
+  angle_radians = math.acos((a * x + b * y) / math.sqrt((a**2 + b**2) * (x**2 + y**2)))
+  return math.degrees(angle_radians)
 
 class InvalidQuadSolveError(Exception):
   pass
@@ -1479,7 +1485,6 @@ def highlight_angle2(ax, origin, p1, p2, radius, color):
         alpha=0.5
     )
     ax.add_patch(wedge)
-    print("Angle highlighted with color:", color)
 
 def search_in_dict(num, my_dict):
     for key in my_dict.keys():
@@ -1492,24 +1497,104 @@ def highlight_same_angle(ax, lines, color_list):
     lines_list = [(draw_line(ax, l, draw=False)) for l in lines]  # Extract points for all lines
     angle_color_radius = {}
 
-    for line1, line2 in combinations(lines_list, 2):
+    for i, (line1, line2) in enumerate(combinations(lines_list, 2)):
         # Calculate the angle
         common_point, other_points, angle = calculate_angle(*line1, *line2)
-        if angle is None or angle > 90:
-            continue  # Skip invalid or small angles
-
+        if angle is None or angle > 91 or angle < 25:
+          continue  # Skip invalid or small angles
         if search_in_dict(angle, angle_color_radius) == False:
           # Assign color and radius for this unique angle
-          color = color_list[len(angle_color_radius) % len(color_list)]
-          radius = 0.05 + len(angle_color_radius) * 0.01
+          color = color_list[i % len(color_list)]
+          radius = angle * 0.001
           angle_color_radius[round(angle,3)] = (color, radius)
-          print(type(angle))
         else:
           color, radius = angle_color_radius[round(angle, 3)]
-          print(type(angle))
+          highlight_angle2(ax, common_point, *other_points, radius, color)
+          
 
-        # Highlight the angle
-        highlight_angle2(ax, common_point, *other_points, radius, color)
+def intersection_point(p1, p2, p3, p4):
+  x1, y1, x2, y2 = p1.x, p1.y, p2.x, p2.y
+  x3, y3, x4, y4 = p3.x, p3.y, p4.x, p4.y
+  # Calculate determinants
+  # Calculate determinants to find intersection
+  denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+  
+  if denom == 0:  # Lines are parallel or coincident
+      return None
+  
+  # Calculate the intersection point using determinant formula
+  t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom
+  u = -((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2)) / denom
+  
+  # Return the intersection point, no need for bounds check for infinite lines
+  intersection_point = (x1 + t * (x2 - x1), y1 + t * (y2 - y1))
+  return intersection_point
+  
+  
+
+def calculate_angle_two_lines_intersections(p1, p2, p3, p4):
+  x1, y1, x2, y2 = p1.x, p1.y, p2.x, p2.y
+  x3, y3, x4, y4 = p3.x, p3.y, p4.x, p4.y
+  
+
+# Create vectors for the lines
+  v1 = (x2 - x1, y2 - y1)  # Vector for Line 1
+  v2 = (x4 - x3, y4 - y3)  # Vector for Line 2
+  
+  # Calculate dot product and magnitudes of the vectors
+  dot_product = v1[0] * v2[0] + v1[1] * v2[1]
+  magnitude_v1 = math.sqrt(v1[0]**2 + v1[1]**2)
+  magnitude_v2 = math.sqrt(v2[0]**2 + v2[1]**2)
+  
+  # Calculate the cosine of the angle
+  cos_theta = dot_product / (magnitude_v1 * magnitude_v2)
+  
+  # Ensure the value is within the valid range for arccos
+  cos_theta = max(-1, min(1, cos_theta))
+  
+  # Calculate the angle in radians and then convert to degrees
+  angle_radians = math.acos(cos_theta)
+  angle_degrees = math.degrees(angle_radians)
+  
+  return angle_degrees
+
+def _draw_highlight_right_angle(ax: matplotlib.axes.Axes, line1, line2):
+  # Create a figure and axis
+  a1, b1 = line1[0], line1[1]
+  a2, b2 = line2[0], line2[1]
+  length = math.sqrt((a1.y - a1.x)**2 + (b1.y - b1.x)**2)
+  slope = (b1.y - a1.y) / (b1.x - a1.x)
+
+  # Find intersection point of the infinite lines
+  angle = calculate_angle_two_lines_intersections(*line1, *line2)
+  intersection = intersection_point(a1, b1, a2, b2)
+  if b1.x - a1.x == 0:
+    slope = (b2.y - a2.y) / (b2.x - a2.x)
+  elif b2.x - a2.x == 0:
+    slope = (b1.y - a1.y) / (b1.x - a1.x)
+  deg = math.degrees(math.atan(slope))
+  if intersection == False:
+    print("No intersection point found.")
+    return
+  elif 89.9 < angle < 90.1:     
+    # Plot the small square at the intersection (highlight right angle)
+    square_size = 0.1
+    square = plt.Rectangle((intersection[0] - square_size / 2, intersection[1] - square_size / 2),
+                            square_size, square_size, color='white', alpha=0.1)
+    rotate = transforms.Affine2D().rotate_deg_around(intersection[0], intersection[1], deg)
+    square.set_transform(rotate + ax.transData)
+
+    ax.add_patch(square)
+  
+
+def draw_highlight_right_angle(ax, lines: list[gm.Line]):
+  lines_list = [(draw_line(ax, l, draw=False)) for l in lines]  # Extract points for all lines
+  for line1, line2 in combinations(lines_list, 2):
+    _draw_highlight_right_angle(ax, line1, line2)
+
+
+
+
   
 
         
@@ -1530,7 +1615,7 @@ def _draw(
 ):
   """Draw everything."""
   colors = ['red', 'green', 'blue', 'orange', 'magenta', 'purple']
-  colors_highlight = [color for color in mcolors.TABLEAU_COLORS.keys() if color not in colors]
+  colors_highlight = list(mcolors.CSS4_COLORS.keys()) + list(mcolors.XKCD_COLORS.keys()) + list(mcolors.TABLEAU_COLORS.keys())
 
   pcolor = 'black'
   lcolor = 'black'
@@ -1589,6 +1674,7 @@ def _draw(
     # Call the highlight function with the determined color
     highlight(ax, 'cong', [p1, p2, p3, p4], lcolor, color, color)
     highlight_same_angle(ax, lines, color_list=colors_highlight)
+    draw_highlight_right_angle(ax, lines)
 
 
     
